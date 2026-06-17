@@ -3,6 +3,14 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { open } from "@tauri-apps/plugin-dialog";
+import { translations, detectLang, saveLang, LANGS, type Lang } from "./i18n";
+import {
+  detectThemePref,
+  saveThemePref,
+  applyTheme,
+  THEME_CYCLE,
+  type ThemePref,
+} from "./theme";
 import "./App.css";
 
 type CompressResult = {
@@ -22,11 +30,7 @@ type Row = {
   error?: string;
 };
 
-const PRESETS = [
-  { label: "Screen", percent: 20, hint: "Feed/Web · kleinste" },
-  { label: "Ebook", percent: 50, hint: "Standard · scharf" },
-  { label: "Printer", percent: 90, hint: "Druck · höchste Treue" },
-];
+const THEME_ICON: Record<ThemePref, string> = { system: "🖥", light: "☀", dark: "🌙" };
 
 function fmtSize(bytes: number): string {
   if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(1)} MB`;
@@ -39,12 +43,22 @@ function basename(p: string): string {
 }
 
 function App() {
+  const [lang, setLang] = useState<Lang>(detectLang());
+  const [theme, setTheme] = useState<ThemePref>(detectThemePref());
   const [percent, setPercent] = useState(80);
   const [inplace, setInplace] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [gsOk, setGsOk] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const t = translations[lang];
+
+  const presets = [
+    { percent: 20, label: t.presetScreen, hint: t.hintScreen },
+    { percent: 50, label: t.presetEbook, hint: t.hintEbook },
+    { percent: 90, label: t.presetPrinter, hint: t.hintPrinter },
+  ];
 
   useEffect(() => {
     invoke<string>("check_ghostscript")
@@ -64,6 +78,30 @@ function App() {
       unlisten.then((f) => f());
     };
   }, []);
+
+  useEffect(() => {
+    saveLang(lang);
+  }, [lang]);
+
+  useEffect(() => {
+    saveThemePref(theme);
+    applyTheme(theme);
+    if (theme !== "system") return;
+    // keep following the OS while on "system"
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = () => applyTheme("system");
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, [theme]);
+
+  function cycleTheme() {
+    const i = THEME_CYCLE.indexOf(theme);
+    setTheme(THEME_CYCLE[(i + 1) % THEME_CYCLE.length]);
+  }
+
+  function themeLabel(p: ThemePref): string {
+    return p === "system" ? t.themeSystem : p === "light" ? t.themeLight : t.themeDark;
+  }
 
   function addPaths(paths: string[]) {
     const pdfs = paths.filter((p) => p.toLowerCase().endsWith(".pdf"));
@@ -93,7 +131,6 @@ function App() {
 
   async function compressAll() {
     setBusy(true);
-    // snapshot of queued/error rows to process
     const targets = rows.filter((r) => r.status === "queued" || r.status === "error");
     for (const target of targets) {
       setRows((prev) =>
@@ -127,28 +164,53 @@ function App() {
   const totalBefore = rows.reduce((s, r) => s + (r.result?.before ?? 0), 0);
   const totalAfter = rows.reduce((s, r) => s + (r.result?.after ?? 0), 0);
   const totalSaved = totalBefore > 0 ? (1 - totalAfter / totalBefore) * 100 : 0;
+  const dpi = Math.round(72 + (300 - 72) * percent / 100);
 
   return (
     <main className="app">
       <header className="head">
         <h1>CDB PDF Compressor</h1>
-        <span className={`gs ${gsOk === false ? "bad" : ""}`}>
-          {gsOk === null ? "…" : gsOk ? "Ghostscript bereit" : "Ghostscript fehlt"}
-        </span>
+        <div className="head-controls">
+          <div className="lang" role="group">
+            {LANGS.map((l) => (
+              <button
+                key={l}
+                className={lang === l ? "active" : ""}
+                onClick={() => setLang(l)}
+              >
+                {l.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <button
+            className="theme"
+            onClick={cycleTheme}
+            title={themeLabel(theme)}
+            aria-label={themeLabel(theme)}
+          >
+            {THEME_ICON[theme]}
+          </button>
+        </div>
       </header>
 
+      <div className="statusline">
+        <span className={`gs ${gsOk === false ? "bad" : ""}`}>
+          {gsOk === null ? "…" : gsOk ? t.gsReady : t.gsMissing}
+        </span>
+      </div>
+
       <section className={`drop ${dragOver ? "over" : ""}`}>
-        <p className="drop-title">PDF(s) hierher ziehen</p>
-        <p className="drop-hint">vom Finder/Desktop · auch mehrere auf einmal</p>
+        <p className="drop-title">{t.dropTitle}</p>
+        <p className="drop-hint">{t.dropHint}</p>
         <button className="ghost pick" onClick={pickFiles} disabled={busy}>
-          Dateien wählen…
+          {t.pick}
         </button>
       </section>
 
       <section className={`controls ${busy ? "locked" : ""}`}>
         <div className="slider">
           <label>
-            Qualität <strong>{percent}%</strong> <span className="muted">≈ {Math.round(72 + (300 - 72) * percent / 100)} dpi</span>
+            {t.quality} <strong>{percent}%</strong> <span className="muted">≈ {dpi} dpi</span>
           </label>
           <input
             type="range"
@@ -159,7 +221,7 @@ function App() {
             onChange={(e) => setPercent(Number(e.target.value))}
           />
           <div className="presets">
-            {PRESETS.map((p) => (
+            {presets.map((p) => (
               <button
                 key={p.label}
                 className={percent === p.percent ? "active" : ""}
@@ -179,8 +241,8 @@ function App() {
             disabled={busy}
             onChange={(e) => setInplace(e.target.checked)}
           />
-          Original ersetzen
-          <span className="muted"> (sonst Kopie daneben)</span>
+          {t.inplace}
+          <span className="muted"> {t.inplaceHint}</span>
         </label>
       </section>
 
@@ -188,15 +250,15 @@ function App() {
         <button className="primary" disabled={busy || queuedCount === 0} onClick={compressAll}>
           {busy ? (
             <>
-              <span className="spin" /> Komprimiere…
+              <span className="spin" /> {t.compressing}
             </>
           ) : (
-            `Komprimieren${queuedCount ? ` (${queuedCount})` : ""}`
+            `${t.compress}${queuedCount ? ` (${queuedCount})` : ""}`
           )}
         </button>
         {rows.length > 0 && (
           <button className="ghost" disabled={busy} onClick={() => setRows([])}>
-            Liste leeren
+            {t.clear}
           </button>
         )}
       </section>
@@ -205,10 +267,10 @@ function App() {
         <table className="results">
           <thead>
             <tr>
-              <th>Datei</th>
-              <th>Vorher</th>
-              <th>Nachher</th>
-              <th>Ersparnis</th>
+              <th>{t.colFile}</th>
+              <th>{t.colBefore}</th>
+              <th>{t.colAfter}</th>
+              <th>{t.colSavings}</th>
               <th></th>
             </tr>
           </thead>
@@ -221,9 +283,9 @@ function App() {
                   {r.status === "running"
                     ? <span className="spin" />
                     : r.status === "error"
-                    ? "Fehler"
+                    ? t.statusError
                     : r.status === "nogain"
-                    ? "kein Gewinn"
+                    ? t.statusNogain
                     : r.result
                     ? fmtSize(r.result.after)
                     : "–"}
@@ -232,7 +294,7 @@ function App() {
                 <td>
                   {r.status === "done" && r.result?.output && (
                     <button className="link" onClick={() => revealItemInDir(r.result!.output!)}>
-                      Im Finder zeigen
+                      {t.reveal}
                     </button>
                   )}
                   {r.status === "error" && <span className="err" title={r.error}>!</span>}
@@ -243,7 +305,7 @@ function App() {
           {totalBefore > 0 && (
             <tfoot>
               <tr>
-                <td>Gesamt</td>
+                <td>{t.total}</td>
                 <td>{fmtSize(totalBefore)}</td>
                 <td>{fmtSize(totalAfter)}</td>
                 <td>−{totalSaved.toFixed(0)}%</td>

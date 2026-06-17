@@ -13,6 +13,7 @@
     "windows": [
       {
         "title": "CDB PDF Compressor",
+        "hiddenTitle": true,
         "width": 760,
         "height": 600,
         "minWidth": 560,

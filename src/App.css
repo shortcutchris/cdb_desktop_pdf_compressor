@@ -1,21 +1,23 @@
+/* Light theme (default). Dark is applied via <html data-theme="dark"> from JS. */
 :root {
   --bg: #ffffff;
   --fg: #111111;
   --muted: #777777;
   --line: #e3e3e3;
   --accent: #111111;
+  --hover: #f4f4f4;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #111111;
-    --fg: #f2f2f2;
-    --muted: #888888;
-    --line: #2a2a2a;
-    --accent: #f2f2f2;
-  }
+:root[data-theme="dark"] {
+  --bg: #111111;
+  --fg: #f2f2f2;
+  --muted: #888888;
+  --line: #2a2a2a;
+  --accent: #f2f2f2;
+  --hover: #1d1d1d;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -34,11 +36,38 @@ body {
 
 .head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 4px;
 }
 .head h1 { font-size: 18px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+.head-controls { display: flex; align-items: center; gap: 8px; }
+
+.lang { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.lang button {
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.lang button.active { background: var(--accent); color: var(--bg); }
+
+.theme {
+  width: 28px;
+  height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+.theme:hover { background: var(--hover); }
+
+.statusline { margin-bottom: 14px; }
 .gs { font-size: 12px; color: var(--muted); }
 .gs.bad { color: #c0392b; font-weight: 600; }
 
