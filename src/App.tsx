@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { open } from "@tauri-apps/plugin-dialog";
 import "./App.css";
 
 type CompressResult = {
@@ -68,12 +69,26 @@ function App() {
     const pdfs = paths.filter((p) => p.toLowerCase().endsWith(".pdf"));
     if (pdfs.length === 0) return;
     setRows((prev) => {
-      const known = new Set(prev.map((r) => r.path));
-      const fresh = pdfs
-        .filter((p) => !known.has(p))
-        .map<Row>((p) => ({ path: p, name: basename(p), status: "queued" }));
-      return [...prev, ...fresh];
+      const next = [...prev];
+      for (const p of pdfs) {
+        const idx = next.findIndex((r) => r.path === p);
+        const row: Row = { path: p, name: basename(p), status: "queued" };
+        // re-dropping/re-picking an already-listed file re-queues it (recompress)
+        if (idx >= 0) next[idx] = row;
+        else next.push(row);
+      }
+      return next;
     });
+  }
+
+  async function pickFiles() {
+    const selected = await open({
+      multiple: true,
+      directory: false,
+      filters: [{ name: "PDF", extensions: ["pdf"] }],
+    });
+    if (!selected) return;
+    addPaths(Array.isArray(selected) ? selected : [selected]);
   }
 
   async function compressAll() {
@@ -122,12 +137,12 @@ function App() {
         </span>
       </header>
 
-      <section
-        className={`drop ${dragOver ? "over" : ""}`}
-        onClick={() => {}}
-      >
+      <section className={`drop ${dragOver ? "over" : ""}`}>
         <p className="drop-title">PDF(s) hierher ziehen</p>
         <p className="drop-hint">vom Finder/Desktop · auch mehrere auf einmal</p>
+        <button className="ghost pick" onClick={pickFiles}>
+          Dateien wählen…
+        </button>
       </section>
 
       <section className="controls">

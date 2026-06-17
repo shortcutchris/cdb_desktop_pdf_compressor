@@ -44,6 +44,25 @@ pub struct CompressResult {
     dpi: u32,
 }
 
+/// Pick a non-colliding output path next to the source, Finder-style:
+/// `name.compressed.pdf`, then `name.compressed 2.pdf`, `name.compressed 3.pdf`, …
+/// so leaving previous results in the folder never overwrites them.
+fn unique_compressed_path(src: &Path) -> PathBuf {
+    let parent = src.parent().unwrap_or_else(|| Path::new("."));
+    let stem = src
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("output");
+    let base = format!("{stem}.compressed");
+    let mut candidate = parent.join(format!("{base}.pdf"));
+    let mut n = 2;
+    while candidate.exists() {
+        candidate = parent.join(format!("{base} {n}.pdf"));
+        n += 1;
+    }
+    candidate
+}
+
 /// Returns the Ghostscript version string, or an error if gs is not available.
 #[tauri::command]
 fn check_ghostscript() -> Result<String, String> {
@@ -127,7 +146,7 @@ fn compress_pdf(path: String, quality_percent: u32, inplace: bool) -> Result<Com
     let dst = if inplace {
         src.clone()
     } else {
-        src.with_extension("compressed.pdf")
+        unique_compressed_path(&src)
     };
     std::fs::rename(&tmp, &dst).map_err(|e| format!("Konnte Ergebnis nicht speichern: {e}"))?;
 
@@ -151,6 +170,7 @@ fn compress_pdf(path: String, quality_percent: u32, inplace: bool) -> Result<Com
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![check_ghostscript, compress_pdf])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

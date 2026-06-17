@@ -55,6 +55,7 @@ body {
 }
 .drop-title { margin: 0; font-size: 15px; font-weight: 600; }
 .drop-hint { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+.drop .pick { margin-top: 14px; }
 
 .controls {
   display: flex;
