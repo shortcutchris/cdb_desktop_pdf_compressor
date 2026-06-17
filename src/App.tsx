@@ -179,7 +179,13 @@ function App() {
 
       <section className="actions">
         <button className="primary" disabled={busy || queuedCount === 0} onClick={compressAll}>
-          {busy ? "Komprimiere…" : `Komprimieren${queuedCount ? ` (${queuedCount})` : ""}`}
+          {busy ? (
+            <>
+              <span className="spin" /> Komprimiere…
+            </>
+          ) : (
+            `Komprimieren${queuedCount ? ` (${queuedCount})` : ""}`
+          )}
         </button>
         {rows.length > 0 && (
           <button className="ghost" disabled={busy} onClick={() => setRows([])}>
@@ -206,7 +212,7 @@ function App() {
                 <td>{r.result ? fmtSize(r.result.before) : "–"}</td>
                 <td>
                   {r.status === "running"
-                    ? "…"
+                    ? <span className="spin" />
                     : r.status === "error"
                     ? "Fehler"
                     : r.status === "nogain"

@@ -78,8 +78,20 @@ fn check_ghostscript() -> Result<String, String> {
 /// With `inplace`, the original is overwritten; otherwise a `<name>.compressed.pdf`
 /// is written next to it. If the result isn't smaller (and not inplace), the original
 /// is left untouched and `output` is None.
+/// Async command wrapper: runs the blocking Ghostscript work on a worker thread
+/// so the UI/main thread stays responsive (no macOS beachball, instant feedback).
 #[tauri::command]
-fn compress_pdf(path: String, quality_percent: u32, inplace: bool) -> Result<CompressResult, String> {
+async fn compress_pdf(
+    path: String,
+    quality_percent: u32,
+    inplace: bool,
+) -> Result<CompressResult, String> {
+    tauri::async_runtime::spawn_blocking(move || compress_pdf_blocking(path, quality_percent, inplace))
+        .await
+        .map_err(|e| format!("Worker-Thread-Fehler: {e}"))?
+}
+
+fn compress_pdf_blocking(path: String, quality_percent: u32, inplace: bool) -> Result<CompressResult, String> {
     let gs = find_gs().ok_or_else(|| {
         "Ghostscript (gs) nicht gefunden. Installieren: brew install ghostscript".to_string()
     })?;
