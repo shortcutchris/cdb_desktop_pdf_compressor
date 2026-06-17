@@ -20,6 +20,8 @@ ssh "$HOST" "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Set-Locati
 
 echo "== Copying installers back to dist-windows/ =="
 mkdir -p "$ROOT/dist-windows"
-scp "$HOST:'$REPO/src-tauri/target/release/bundle/nsis/*.exe'" "$ROOT/dist-windows/" || true
-scp "$HOST:'$REPO/src-tauri/target/release/bundle/msi/*.msi'" "$ROOT/dist-windows/" || true
+# -O forces the legacy scp protocol so the remote shell expands the *.exe/*.msi glob
+# (the default SFTP protocol does not glob -> "No such file").
+scp -O "$HOST:$REPO/src-tauri/target/release/bundle/nsis/*.exe" "$ROOT/dist-windows/" || true
+scp -O "$HOST:$REPO/src-tauri/target/release/bundle/msi/*.msi" "$ROOT/dist-windows/" || true
 ls -la "$ROOT/dist-windows/"
