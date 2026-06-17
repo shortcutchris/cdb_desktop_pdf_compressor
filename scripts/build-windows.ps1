@@ -33,8 +33,9 @@ npm run tauri build
 
 if (Test-Path $key) {
     Write-Host "== Updater-Artefakt signieren =="
+    # newest -setup.exe = the one we just built (old versions linger in the dir)
     $setup = Get-ChildItem "src-tauri\target\release\bundle\nsis" -Filter *-setup.exe |
-        Select-Object -First 1 -ExpandProperty FullName
+        Sort-Object LastWriteTime | Select-Object -Last 1 -ExpandProperty FullName
     & cmd /c "npx @tauri-apps/cli signer sign -f `"$key`" -p `"`" `"$setup`""
 }
 
