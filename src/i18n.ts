@@ -34,6 +34,8 @@ export type Strings = {
   themeSystem: string;
   themeLight: string;
   themeDark: string;
+  updateAvailable: string;
+  updateDownload: string;
 };
 
 export const translations: Record<Lang, Strings> = {
@@ -66,6 +68,8 @@ export const translations: Record<Lang, Strings> = {
     themeSystem: "System",
     themeLight: "Hell",
     themeDark: "Dunkel",
+    updateAvailable: "Update verfügbar:",
+    updateDownload: "Herunterladen",
   },
   en: {
     gsReady: "Ghostscript ready",
@@ -96,6 +100,8 @@ export const translations: Record<Lang, Strings> = {
     themeSystem: "System",
     themeLight: "Light",
     themeDark: "Dark",
+    updateAvailable: "Update available:",
+    updateDownload: "Download",
   },
 };
 

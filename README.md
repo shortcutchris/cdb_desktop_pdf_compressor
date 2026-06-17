@@ -64,6 +64,22 @@ git tag v0.1.0 && git push origin v0.1.0
 - **Engine:** Ghostscript (`gs`), self-contained gebündelt pro Plattform
 - **Plattform:** macOS (Apple Silicon) fertig; Windows über CI; Intel/Universal = Folgeschritt
 
+## Update-Check
+
+Beim Start vergleicht die App ihre Version (`getVersion()`) mit dem neuesten
+**GitHub-Release** von `shortcutchris/cdb_desktop_pdf_compressor`
+(`api.github.com/repos/.../releases/latest`). Ist eine neuere Version verfügbar,
+zeigt sie ein Banner mit „Herunterladen" → öffnet die Release-Seite im Browser.
+Offline / kein Release / Fehler → still kein Banner. (Check + Link, kein
+Selbst-Install — analog zum CDB Desktop Recorder.)
+
+**Release veröffentlichen** (macht zugleich die Downloads + den Update-Check live):
+1. Version **in `src-tauri/tauri.conf.json` UND `src-tauri/Cargo.toml`** bumpen
+   (sonst erkennt der Check das Update nicht).
+2. macOS + Windows bauen (`scripts/build-macos.sh --dmg`, `scripts/build-windows-remote.sh greyiron`).
+3. GitHub-Release `vX.Y.Z` anlegen und `.dmg` / `.msi` / `.exe` als Assets anhängen
+   (`gh release create vX.Y.Z dist-windows/* "…/dmg/…dmg"`).
+
 ## Hinweise
 
 - Das `.app`/`.dmg` ist **ad-hoc signiert** (nicht notarisiert) → beim ersten Öffnen
