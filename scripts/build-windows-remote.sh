@@ -15,8 +15,9 @@ REPO="${2:-C:/Users/chubm/cdbpdf}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 echo "== Remote build on $HOST ($REPO) =="
-# pull latest, then build via the in-repo PowerShell script
-ssh "$HOST" "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Set-Location '$REPO'; git pull --ff-only; powershell -ExecutionPolicy Bypass -File scripts\\build-windows.ps1\""
+# Hard-reset to origin/main (local changes like a rebuilt Cargo.lock must never
+# block the sync), then build via the in-repo PowerShell script.
+ssh "$HOST" "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Set-Location '$REPO'; git fetch origin; git reset --hard origin/main; powershell -ExecutionPolicy Bypass -File scripts\\build-windows.ps1\""
 
 echo "== Copying installers back to dist-windows/ =="
 mkdir -p "$ROOT/dist-windows"
