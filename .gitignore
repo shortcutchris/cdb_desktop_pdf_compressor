@@ -34,3 +34,6 @@ dist-windows/
 
 # lokale Release-Staging-Artefakte
 _release_assets/
+
+# Updater-Manifest (pro Release erzeugt)
+latest.json

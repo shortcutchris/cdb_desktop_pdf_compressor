@@ -13,6 +13,14 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+# 0) updater signing key (kept outside the repo). When present, tauri build
+#    produces a signed .app.tar.gz for the in-app updater.
+KEY="${TAURI_SIGNING_PRIVATE_KEY_PATH:-$HOME/.tauri/cdb-pdf-compressor.key}"
+if [ -f "$KEY" ]; then
+  export TAURI_SIGNING_PRIVATE_KEY="$(cat "$KEY")"
+  export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}"
+fi
+
 # 1) self-contained Ghostscript bundle
 [ -f src-tauri/gs/bin/gs ] || ./scripts/bundle-gs.sh
 
@@ -44,6 +52,16 @@ plutil -replace CFBundleIconFile -string AppIcon "$APP/Contents/Info.plist"
 codesign --force --deep -s - "$APP"
 
 echo "✓ $APP  (light/dark adaptive icon, bundled gs)"
+
+# 5b) The updater tarball is auto-built from the UN-patched .app, so rebuild it
+#     from the icon-patched .app and re-sign it (if we have the updater key).
+if [ -f "$KEY" ]; then
+  MACOS_DIR="src-tauri/target/release/bundle/macos"
+  TARGZ="$MACOS_DIR/CDB PDF Compressor.app.tar.gz"
+  ( cd "$MACOS_DIR" && tar -czf "CDB PDF Compressor.app.tar.gz" "CDB PDF Compressor.app" )
+  npx @tauri-apps/cli signer sign -f "$KEY" -p "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" "$TARGZ" >/dev/null
+  echo "✓ Updater-Tarball neu gepackt + signiert"
+fi
 
 # 6) optional: wrap the patched .app into a .dmg (pass --dmg)
 if [[ "${1:-}" == "--dmg" ]]; then

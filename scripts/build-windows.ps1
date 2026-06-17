@@ -16,6 +16,15 @@ Set-Location $root
 # cargo on PATH (rustup is installed with --no-modify-path on headless setups)
 $env:Path = "$env:USERPROFILE\.cargo\bin;" + $env:Path
 
+# Updater signing key (kept outside the repo). When present, tauri build
+# produces a signed -setup.exe for the in-app updater.
+$key = "$env:USERPROFILE\.tauri\cdb-pdf-compressor.key"
+if (Test-Path $key) {
+    $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content $key -Raw
+    if (-not $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) { $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "" }
+    Write-Host "== Updater-Signing aktiv =="
+}
+
 Write-Host "== Bundling Ghostscript from $GsDir =="
 & powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\bundle-gs.ps1" -GsDir $GsDir
 

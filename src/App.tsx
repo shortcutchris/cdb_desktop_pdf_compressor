@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { getVersion } from "@tauri-apps/api/app";
-import { revealItemInDir, openUrl, openPath } from "@tauri-apps/plugin-opener";
+import { revealItemInDir, openPath } from "@tauri-apps/plugin-opener";
 import { open } from "@tauri-apps/plugin-dialog";
+import { check, type Update } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 import { translations, detectLang, saveLang, LANGS, type Lang } from "./i18n";
 import {
   detectThemePref,
@@ -33,40 +34,6 @@ type Row = {
 
 const THEME_ICON: Record<ThemePref, string> = { system: "🖥", light: "☀", dark: "🌙" };
 
-const RELEASES_REPO = "shortcutchris/cdb_desktop_pdf_compressor";
-
-function isNewer(latest: string, current: string): boolean {
-  const a = latest.split(".").map((n) => parseInt(n, 10) || 0);
-  const b = current.split(".").map((n) => parseInt(n, 10) || 0);
-  for (let i = 0; i < Math.max(a.length, b.length); i++) {
-    const x = a[i] || 0;
-    const y = b[i] || 0;
-    if (x !== y) return x > y;
-  }
-  return false;
-}
-
-// Launch-time update check: compare the running version against the latest
-// GitHub release of the public repo. Returns the newer version + release page,
-// or null (no update / offline / no release yet — all handled silently).
-async function checkForUpdate(): Promise<{ version: string; url: string } | null> {
-  try {
-    const current = await getVersion();
-    const res = await fetch(`https://api.github.com/repos/${RELEASES_REPO}/releases/latest`, {
-      headers: { Accept: "application/vnd.github+json" },
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const latest = String(data.tag_name ?? "").replace(/^v/, "");
-    if (latest && isNewer(latest, current)) {
-      return { version: latest, url: String(data.html_url) };
-    }
-  } catch {
-    /* offline or no release — ignore */
-  }
-  return null;
-}
-
 function fmtSize(bytes: number): string {
   if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(1)} MB`;
   if (bytes >= 1e3) return `${(bytes / 1e3).toFixed(0)} KB`;
@@ -87,7 +54,8 @@ function App() {
   const [dragOver, setDragOver] = useState(false);
   const [gsOk, setGsOk] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
-  const [update, setUpdate] = useState<{ version: string; url: string } | null>(null);
+  const [update, setUpdate] = useState<Update | null>(null);
+  const [updating, setUpdating] = useState(false);
 
   const t = translations[lang];
 
@@ -102,7 +70,13 @@ function App() {
       .then(() => setGsOk(true))
       .catch(() => setGsOk(false));
 
-    checkForUpdate().then(setUpdate);
+    check()
+      .then((u) => {
+        if (u) setUpdate(u);
+      })
+      .catch(() => {
+        /* offline / no manifest — ignore */
+      });
 
     const unlisten = getCurrentWebviewWindow().onDragDropEvent((event) => {
       const p = event.payload;
@@ -138,6 +112,17 @@ function App() {
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
   }, [theme]);
+
+  async function installUpdate() {
+    if (!update || updating) return;
+    setUpdating(true);
+    try {
+      await update.downloadAndInstall();
+      await relaunch();
+    } catch {
+      setUpdating(false);
+    }
+  }
 
   function cycleTheme() {
     const i = THEME_CYCLE.indexOf(theme);
@@ -219,12 +204,20 @@ function App() {
           <span>
             {t.updateAvailable} <strong>v{update.version}</strong>
           </span>
-          <button className="update-dl" onClick={() => openUrl(update.url)}>
-            {t.updateDownload}
+          <button className="update-dl" onClick={installUpdate} disabled={updating}>
+            {updating ? (
+              <>
+                <span className="spin" /> {t.updateInstalling}
+              </>
+            ) : (
+              t.updateInstall
+            )}
           </button>
-          <button className="update-x" onClick={() => setUpdate(null)} aria-label="×">
-            ×
-          </button>
+          {!updating && (
+            <button className="update-x" onClick={() => setUpdate(null)} aria-label="×">
+              ×
+            </button>
+          )}
         </div>
       )}
 
