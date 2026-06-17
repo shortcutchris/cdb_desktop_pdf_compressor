@@ -9,8 +9,9 @@ dist-ssr/
 src-tauri/target/
 **/*.rs.bk
 
-# Gebündelte Engine-Binaries (groß, plattformspezifisch — separat beziehen/bauen)
+# Gebündelte Engine-Binaries (groß, plattformspezifisch — via scripts/bundle-gs.sh erzeugen)
 src-tauri/binaries/
+src-tauri/gs/
 *.gscompress.tmp.pdf
 
 # OS / Editor

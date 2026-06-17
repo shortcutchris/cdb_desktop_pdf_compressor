@@ -140,12 +140,12 @@ function App() {
       <section className={`drop ${dragOver ? "over" : ""}`}>
         <p className="drop-title">PDF(s) hierher ziehen</p>
         <p className="drop-hint">vom Finder/Desktop · auch mehrere auf einmal</p>
-        <button className="ghost pick" onClick={pickFiles}>
+        <button className="ghost pick" onClick={pickFiles} disabled={busy}>
           Dateien wählen…
         </button>
       </section>
 
-      <section className="controls">
+      <section className={`controls ${busy ? "locked" : ""}`}>
         <div className="slider">
           <label>
             Qualität <strong>{percent}%</strong> <span className="muted">≈ {Math.round(72 + (300 - 72) * percent / 100)} dpi</span>
@@ -155,6 +155,7 @@ function App() {
             min={1}
             max={100}
             value={percent}
+            disabled={busy}
             onChange={(e) => setPercent(Number(e.target.value))}
           />
           <div className="presets">
@@ -162,6 +163,7 @@ function App() {
               <button
                 key={p.label}
                 className={percent === p.percent ? "active" : ""}
+                disabled={busy}
                 onClick={() => setPercent(p.percent)}
                 title={p.hint}
               >
@@ -171,7 +173,12 @@ function App() {
           </div>
         </div>
         <label className="inplace">
-          <input type="checkbox" checked={inplace} onChange={(e) => setInplace(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={inplace}
+            disabled={busy}
+            onChange={(e) => setInplace(e.target.checked)}
+          />
           Original ersetzen
           <span className="muted"> (sonst Kopie daneben)</span>
         </label>

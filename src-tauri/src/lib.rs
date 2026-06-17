@@ -14,9 +14,17 @@ fn pct_to_dpi(pct: u32) -> u32 {
     (DPI_MIN as f64 + (DPI_MAX - DPI_MIN) as f64 * pct as f64 / 100.0).round() as u32
 }
 
-/// Locate the Ghostscript binary. GUI apps on macOS don't inherit the shell PATH,
-/// so we probe the common Homebrew/system locations in addition to PATH.
-fn find_gs() -> Option<String> {
+/// A resolved Ghostscript engine: the binary plus, for the bundled (relocated) gs,
+/// the env/args needed to find its Resource/font/ICC files.
+struct GsEngine {
+    bin: PathBuf,
+    gs_lib: Option<String>,  // value for the GS_LIB env var (bundled only)
+    icc_dir: Option<String>, // value for -sICCProfilesDir (bundled only)
+}
+
+/// Locate a system Ghostscript. GUI apps on macOS don't inherit the shell PATH,
+/// so we probe common Homebrew/system locations in addition to PATH.
+fn find_system_gs() -> Option<PathBuf> {
     let candidates = [
         "/opt/homebrew/bin/gs", // Apple Silicon Homebrew
         "/usr/local/bin/gs",    // Intel Homebrew
@@ -24,14 +32,46 @@ fn find_gs() -> Option<String> {
     ];
     for c in candidates {
         if Path::new(c).exists() {
-            return Some(c.to_string());
+            return Some(PathBuf::from(c));
         }
     }
     // Fallback: rely on PATH (works in `tauri dev`, where the shell PATH is inherited).
     if Command::new("gs").arg("--version").output().is_ok() {
-        return Some("gs".to_string());
+        return Some(PathBuf::from("gs"));
     }
     None
+}
+
+/// Resolve the engine to use: prefer the gs bundled into the app's resources
+/// (self-contained, no Homebrew needed); fall back to a system gs (dev / unbundled).
+fn resolve_gs(app: &tauri::AppHandle) -> Option<GsEngine> {
+    use tauri::Manager;
+    if let Ok(res) = app.path().resource_dir() {
+        let bin = res.join("gs/bin/gs");
+        if bin.exists() {
+            let share = res.join("gs/share/ghostscript");
+            let gs_lib = [
+                share.join("Resource/Init"),
+                share.join("lib"),
+                share.join("Resource"),
+                share.join("fonts"),
+            ]
+            .iter()
+            .map(|p| p.to_string_lossy().into_owned())
+            .collect::<Vec<_>>()
+            .join(":");
+            return Some(GsEngine {
+                bin,
+                gs_lib: Some(gs_lib),
+                icc_dir: Some(format!("{}/", share.join("iccprofiles").to_string_lossy())),
+            });
+        }
+    }
+    find_system_gs().map(|bin| GsEngine {
+        bin,
+        gs_lib: None,
+        icc_dir: None,
+    })
 }
 
 #[derive(serde::Serialize)]
@@ -65,9 +105,13 @@ fn unique_compressed_path(src: &Path) -> PathBuf {
 
 /// Returns the Ghostscript version string, or an error if gs is not available.
 #[tauri::command]
-fn check_ghostscript() -> Result<String, String> {
-    let gs = find_gs().ok_or_else(|| "Ghostscript (gs) nicht gefunden".to_string())?;
-    let out = Command::new(&gs)
+fn check_ghostscript(app: tauri::AppHandle) -> Result<String, String> {
+    let engine = resolve_gs(&app).ok_or_else(|| "Ghostscript (gs) nicht gefunden".to_string())?;
+    let mut cmd = Command::new(&engine.bin);
+    if let Some(lib) = &engine.gs_lib {
+        cmd.env("GS_LIB", lib);
+    }
+    let out = cmd
         .arg("--version")
         .output()
         .map_err(|e| format!("gs konnte nicht gestartet werden: {e}"))?;
@@ -82,20 +126,27 @@ fn check_ghostscript() -> Result<String, String> {
 /// so the UI/main thread stays responsive (no macOS beachball, instant feedback).
 #[tauri::command]
 async fn compress_pdf(
+    app: tauri::AppHandle,
     path: String,
     quality_percent: u32,
     inplace: bool,
 ) -> Result<CompressResult, String> {
-    tauri::async_runtime::spawn_blocking(move || compress_pdf_blocking(path, quality_percent, inplace))
-        .await
-        .map_err(|e| format!("Worker-Thread-Fehler: {e}"))?
-}
-
-fn compress_pdf_blocking(path: String, quality_percent: u32, inplace: bool) -> Result<CompressResult, String> {
-    let gs = find_gs().ok_or_else(|| {
+    let engine = resolve_gs(&app).ok_or_else(|| {
         "Ghostscript (gs) nicht gefunden. Installieren: brew install ghostscript".to_string()
     })?;
+    tauri::async_runtime::spawn_blocking(move || {
+        compress_pdf_blocking(&engine, path, quality_percent, inplace)
+    })
+    .await
+    .map_err(|e| format!("Worker-Thread-Fehler: {e}"))?
+}
 
+fn compress_pdf_blocking(
+    engine: &GsEngine,
+    path: String,
+    quality_percent: u32,
+    inplace: bool,
+) -> Result<CompressResult, String> {
     let src = PathBuf::from(&path);
     if src.extension().and_then(|e| e.to_str()).map(|e| e.to_lowercase()) != Some("pdf".into()) {
         return Err(format!("Keine PDF-Datei: {path}"));
@@ -108,26 +159,35 @@ fn compress_pdf_blocking(path: String, quality_percent: u32, inplace: bool) -> R
     let mono_res = res.max(300);
     let tmp = src.with_extension("gscompress.tmp.pdf");
 
-    let status = Command::new(&gs)
-        .args([
-            "-sDEVICE=pdfwrite",
-            "-dCompatibilityLevel=1.5",
-            "-dNOPAUSE",
-            "-dBATCH",
-            "-dQUIET",
-            "-dDetectDuplicateImages=true",
-            "-dCompressFonts=true",
-            // high-quality JPEG base; resolution is overridden explicitly below
-            "-dPDFSETTINGS=/printer",
-            "-dDownsampleColorImages=true",
-            &format!("-dColorImageResolution={res}"),
-            "-dColorImageDownsampleType=/Bicubic",
-            "-dDownsampleGrayImages=true",
-            &format!("-dGrayImageResolution={res}"),
-            "-dGrayImageDownsampleType=/Bicubic",
-            "-dDownsampleMonoImages=true",
-            &format!("-dMonoImageResolution={mono_res}"),
-        ])
+    let mut cmd = Command::new(&engine.bin);
+    // Bundled gs needs GS_LIB / ICC dir pointing at its relocated resources;
+    // a system gs finds its own (these are None then).
+    if let Some(lib) = &engine.gs_lib {
+        cmd.env("GS_LIB", lib);
+    }
+    cmd.args([
+        "-sDEVICE=pdfwrite",
+        "-dCompatibilityLevel=1.5",
+        "-dNOPAUSE",
+        "-dBATCH",
+        "-dQUIET",
+        "-dDetectDuplicateImages=true",
+        "-dCompressFonts=true",
+        // high-quality JPEG base; resolution is overridden explicitly below
+        "-dPDFSETTINGS=/printer",
+        "-dDownsampleColorImages=true",
+        &format!("-dColorImageResolution={res}"),
+        "-dColorImageDownsampleType=/Bicubic",
+        "-dDownsampleGrayImages=true",
+        &format!("-dGrayImageResolution={res}"),
+        "-dGrayImageDownsampleType=/Bicubic",
+        "-dDownsampleMonoImages=true",
+        &format!("-dMonoImageResolution={mono_res}"),
+    ]);
+    if let Some(icc) = &engine.icc_dir {
+        cmd.arg(format!("-sICCProfilesDir={icc}"));
+    }
+    let status = cmd
         .arg(format!("-sOutputFile={}", tmp.display()))
         .arg(&src)
         .status()
