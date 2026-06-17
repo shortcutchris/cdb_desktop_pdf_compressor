@@ -38,11 +38,17 @@ brew install ghostscript dylibbundler
 ./scripts/build-macos.sh --dmg      # -> src-tauri/target/release/bundle/{macos,dmg}
 ```
 
-**Windows** (auf einem Windows-Rechner):
+**Windows** (auf einem Windows-Rechner — einmalig Node, Git, Rust+MSVC-C++-Build-Tools):
 ```powershell
-choco install ghostscript
-pwsh scripts/bundle-gs.ps1          # bündelt gswin64c.exe + Resources
-npm ci; npm run tauri build         # -> src-tauri/target/release/bundle/{msi,nsis}
+# Ghostscript besorgen: offiziellen Installer mit 7-Zip entpacken
+#   (das choco-Paket ist headless flaky). 7z x gs<ver>w64.exe -oC:\gs-extract
+powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1   # bundelt gs + baut .msi/.exe
+# -> src-tauri\target\release\bundle\{msi,nsis}
+```
+
+**Windows-Remote-Build** (vom Mac aus, über SSH/Tailscale auf einen provisionierten Windows-Host):
+```bash
+./scripts/build-windows-remote.sh greyiron      # baut remote + holt Installer nach dist-windows/
 ```
 
 **CI / Releases:** Ein Git-Tag `v*` pushen → `.github/workflows/release.yml` baut auf

@@ -28,3 +28,6 @@ Thumbs.db
 .env
 .env.*
 _local/
+
+# Windows-Installer vom Remote-Build (greyiron)
+dist-windows/
