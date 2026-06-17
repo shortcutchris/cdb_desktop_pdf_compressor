@@ -10,11 +10,25 @@ App gibt ihr eine native, drag-&-drop-fähige Oberfläche.
 
 ## Status
 
-🌱 **Vorbereitung / Konzept.** Noch kein App-Code. Vorhanden:
+🏗️ **Scaffold steht.** Tauri v2 + React + TypeScript + Vite, Frontend baut (`npm run build`).
+Engine-Anbindung (Ghostscript) und UI (Drag & Drop, Slider, Ergebnis-Tabelle) folgen.
 
+- `src/`, `src-tauri/` — Tauri-v2-App (React-TS-Template, umbenannt auf `cdb-pdf-compressor`)
 - `reference-skill/` — 1:1-Kopie des `pdf-compress`-Skills (Engine-Referenz: `tools/compress.py`)
 - `REQUIREMENTS.md` — Funktions- und Nicht-Funktionsanforderungen
 - `RESEARCH.md` — Markt-/Bibliotheks-/Framework-Recherche + Empfehlung
+- `LICENSE` — AGPL-3.0
+
+## Entwicklung
+
+```bash
+npm install
+npm run tauri dev     # benötigt Rust/Cargo (siehe unten)
+```
+
+> **Voraussetzung Rust:** Tauri baut den nativen Core mit Cargo. Einmalig installieren:
+> `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+> (Node ✓ und Ghostscript `gs` ✓ sind auf diesem Rechner bereits vorhanden.)
 
 ## Eckdaten
 
