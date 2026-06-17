@@ -41,5 +41,16 @@ foreach ($d in @("Resource", "lib", "iccprofiles", "fonts")) {
     }
 }
 
+# Bundle the VC++ 2015-2022 runtime DLLs gs links against, app-local (next to
+# gswin64c.exe), so end-user machines WITHOUT the VC++ Redistributable can run
+# it. The api-ms-win-crt-* (Universal CRT) forwarders are part of Windows 10/11
+# itself, so they are intentionally NOT bundled.
+$vcDlls = @("vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll")
+foreach ($dll in $vcDlls) {
+    $sys = Join-Path $env:SystemRoot "System32\$dll"
+    if (Test-Path $sys) { Copy-Item $sys "$dest\bin\" -Force }
+    else { Write-Warning "VC++-Runtime-DLL nicht gefunden: $dll (VC++ Redistributable installieren)" }
+}
+
 $size = "{0:N0} MB" -f ((Get-ChildItem $dest -Recurse | Measure-Object Length -Sum).Sum / 1MB)
 Write-Host "OK Bundle erstellt: $size"
