@@ -1,0 +1,26 @@
+# Node / Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+
+# Tauri / Rust
+src-tauri/target/
+**/*.rs.bk
+
+# Gebündelte Engine-Binaries (groß, plattformspezifisch — separat beziehen/bauen)
+src-tauri/binaries/
+*.gscompress.tmp.pdf
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Secrets / lokal
+.env
+.env.*
+_local/
