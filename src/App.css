@@ -185,6 +185,23 @@ button.link {
 }
 .err { color: #c0392b; font-weight: 700; cursor: help; }
 .row-actions { display: inline-flex; gap: 12px; }
+.row-x {
+  margin-left: 12px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.row-x:hover { color: var(--fg); }
+
+.version {
+  margin-top: 22px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+}
 
 .spin {
   display: inline-block;

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { getVersion } from "@tauri-apps/api/app";
 import { revealItemInDir, openPath } from "@tauri-apps/plugin-opener";
 import { open } from "@tauri-apps/plugin-dialog";
 import { check, type Update } from "@tauri-apps/plugin-updater";
@@ -56,6 +57,7 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [update, setUpdate] = useState<Update | null>(null);
   const [updating, setUpdating] = useState(false);
+  const [appVersion, setAppVersion] = useState("");
 
   const t = translations[lang];
 
@@ -69,6 +71,8 @@ function App() {
     invoke<string>("check_ghostscript")
       .then(() => setGsOk(true))
       .catch(() => setGsOk(false));
+
+    getVersion().then(setAppVersion).catch(() => {});
 
     check()
       .then((u) => {
@@ -147,6 +151,10 @@ function App() {
       }
       return next;
     });
+  }
+
+  function removeRow(path: string) {
+    setRows((prev) => prev.filter((r) => r.path !== path));
   }
 
   async function pickFiles() {
@@ -365,6 +373,11 @@ function App() {
                     </span>
                   )}
                   {r.status === "error" && <span className="err" title={r.error}>!</span>}
+                  {!busy && (
+                    <button className="row-x" onClick={() => removeRow(r.path)} aria-label="×" title="Entfernen">
+                      ×
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -382,6 +395,8 @@ function App() {
           )}
         </table>
       )}
+
+      {appVersion && <footer className="version">v{appVersion}</footer>}
     </main>
   );
 }
