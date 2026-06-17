@@ -14,6 +14,9 @@ src-tauri/binaries/
 src-tauri/gs/
 *.gscompress.tmp.pdf
 
+# Asset-catalog icon sizes (regenerated from icon-src/ by scripts/build-macos.sh)
+src-tauri/macos-appicon/AppIcon.xcassets/AppIcon.appiconset/icon_*.png
+
 # OS / Editor
 .DS_Store
 Thumbs.db
