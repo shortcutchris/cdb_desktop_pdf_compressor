@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getVersion } from "@tauri-apps/api/app";
-import { revealItemInDir, openUrl } from "@tauri-apps/plugin-opener";
+import { revealItemInDir, openUrl, openPath } from "@tauri-apps/plugin-opener";
 import { open } from "@tauri-apps/plugin-dialog";
 import { translations, detectLang, saveLang, LANGS, type Lang } from "./i18n";
 import {
@@ -80,8 +80,9 @@ function basename(p: string): string {
 function App() {
   const [lang, setLang] = useState<Lang>(detectLang());
   const [theme, setTheme] = useState<ThemePref>(detectThemePref());
-  const [percent, setPercent] = useState(80);
-  const [inplace, setInplace] = useState(false);
+  const [percent, setPercent] = useState(() => Number(localStorage.getItem("cdbpdf.percent")) || 80);
+  const [inplace, setInplace] = useState(() => localStorage.getItem("cdbpdf.inplace") === "1");
+  const [grayscale, setGrayscale] = useState(() => localStorage.getItem("cdbpdf.grayscale") === "1");
   const [rows, setRows] = useState<Row[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [gsOk, setGsOk] = useState<boolean | null>(null);
@@ -120,6 +121,12 @@ function App() {
   useEffect(() => {
     saveLang(lang);
   }, [lang]);
+
+  useEffect(() => {
+    localStorage.setItem("cdbpdf.percent", String(percent));
+    localStorage.setItem("cdbpdf.inplace", inplace ? "1" : "0");
+    localStorage.setItem("cdbpdf.grayscale", grayscale ? "1" : "0");
+  }, [percent, inplace, grayscale]);
 
   useEffect(() => {
     saveThemePref(theme);
@@ -179,6 +186,7 @@ function App() {
           path: target.path,
           qualityPercent: percent,
           inplace,
+          grayscale,
         });
         setRows((prev) =>
           prev.map((r) =>
@@ -296,6 +304,15 @@ function App() {
           {t.inplace}
           <span className="muted"> {t.inplaceHint}</span>
         </label>
+        <label className="inplace">
+          <input
+            type="checkbox"
+            checked={grayscale}
+            disabled={busy}
+            onChange={(e) => setGrayscale(e.target.checked)}
+          />
+          {t.grayscale}
+        </label>
       </section>
 
       <section className="actions">
@@ -345,9 +362,14 @@ function App() {
                 <td>{r.status === "done" && r.result ? `−${r.result.saved_pct.toFixed(0)}%` : "–"}</td>
                 <td>
                   {r.status === "done" && r.result?.output && (
-                    <button className="link" onClick={() => revealItemInDir(r.result!.output!)}>
-                      {t.reveal}
-                    </button>
+                    <span className="row-actions">
+                      <button className="link" onClick={() => openPath(r.result!.output!)}>
+                        {t.openFile}
+                      </button>
+                      <button className="link" onClick={() => revealItemInDir(r.result!.output!)}>
+                        {t.reveal}
+                      </button>
+                    </span>
                   )}
                   {r.status === "error" && <span className="err" title={r.error}>!</span>}
                 </td>

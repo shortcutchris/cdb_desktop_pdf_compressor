@@ -164,12 +164,13 @@ async fn compress_pdf(
     path: String,
     quality_percent: u32,
     inplace: bool,
+    grayscale: bool,
 ) -> Result<CompressResult, String> {
     let engine = resolve_gs(&app).ok_or_else(|| {
         "Ghostscript (gs) nicht gefunden. Installieren: brew install ghostscript".to_string()
     })?;
     tauri::async_runtime::spawn_blocking(move || {
-        compress_pdf_blocking(&engine, path, quality_percent, inplace)
+        compress_pdf_blocking(&engine, path, quality_percent, inplace, grayscale)
     })
     .await
     .map_err(|e| format!("Worker-Thread-Fehler: {e}"))?
@@ -180,6 +181,7 @@ fn compress_pdf_blocking(
     path: String,
     quality_percent: u32,
     inplace: bool,
+    grayscale: bool,
 ) -> Result<CompressResult, String> {
     let src = PathBuf::from(&path);
     if src.extension().and_then(|e| e.to_str()).map(|e| e.to_lowercase()) != Some("pdf".into()) {
@@ -221,6 +223,14 @@ fn compress_pdf_blocking(
     ]);
     if let Some(icc) = &engine.icc_dir {
         cmd.arg(format!("-sICCProfilesDir={icc}"));
+    }
+    if grayscale {
+        // Convert all color to grayscale — big extra savings for scans/slides.
+        cmd.args([
+            "-sColorConversionStrategy=Gray",
+            "-dProcessColorModel=/DeviceGray",
+            "-dOverrideICC=true",
+        ]);
     }
     let status = cmd
         .arg(format!("-sOutputFile={}", tmp.display()))

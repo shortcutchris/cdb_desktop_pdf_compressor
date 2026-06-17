@@ -184,6 +184,7 @@ button.link {
   cursor: pointer;
 }
 .err { color: #c0392b; font-weight: 700; cursor: help; }
+.row-actions { display: inline-flex; gap: 12px; }
 
 .spin {
   display: inline-block;

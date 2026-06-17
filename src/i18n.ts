@@ -20,6 +20,8 @@ export type Strings = {
   hintPrinter: string;
   inplace: string;
   inplaceHint: string;
+  grayscale: string;
+  openFile: string;
   compress: string;
   compressing: string;
   clear: string;
@@ -54,6 +56,8 @@ export const translations: Record<Lang, Strings> = {
     hintPrinter: "Druck · höchste Treue",
     inplace: "Original ersetzen",
     inplaceHint: "(sonst Kopie daneben)",
+    grayscale: "In Graustufen umwandeln",
+    openFile: "Öffnen",
     compress: "Komprimieren",
     compressing: "Komprimiere…",
     clear: "Liste leeren",
@@ -86,6 +90,8 @@ export const translations: Record<Lang, Strings> = {
     hintPrinter: "Print · highest fidelity",
     inplace: "Replace original",
     inplaceHint: "(otherwise a copy alongside)",
+    grayscale: "Convert to grayscale",
+    openFile: "Open",
     compress: "Compress",
     compressing: "Compressing…",
     clear: "Clear list",
