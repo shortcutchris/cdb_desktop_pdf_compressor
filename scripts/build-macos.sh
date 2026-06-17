@@ -59,7 +59,8 @@ if [ -f "$KEY" ]; then
   MACOS_DIR="src-tauri/target/release/bundle/macos"
   TARGZ="$MACOS_DIR/CDB PDF Compressor.app.tar.gz"
   ( cd "$MACOS_DIR" && tar -czf "CDB PDF Compressor.app.tar.gz" "CDB PDF Compressor.app" )
-  npx @tauri-apps/cli signer sign -f "$KEY" -p "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" "$TARGZ" >/dev/null
+  # key + password come from the exported env vars (don't also pass -f/-p)
+  npx @tauri-apps/cli signer sign "$TARGZ" >/dev/null
   echo "✓ Updater-Tarball neu gepackt + signiert"
 fi
 
