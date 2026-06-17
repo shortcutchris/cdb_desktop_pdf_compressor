@@ -51,6 +51,12 @@ if [[ "${1:-}" == "--dmg" ]]; then
   mkdir -p "$DMG_DIR"
   DMG="$DMG_DIR/CDB PDF Compressor.dmg"
   rm -f "$DMG"
-  hdiutil create -volname "CDB PDF Compressor" -srcfolder "$APP" -ov -format UDZO "$DMG" >/dev/null
-  echo "✓ $DMG"
+  # Stage the .app next to an /Applications symlink so users drag-install.
+  STAGE="$(mktemp -d)/CDB PDF Compressor"
+  mkdir -p "$STAGE"
+  cp -R "$APP" "$STAGE/"
+  ln -s /Applications "$STAGE/Applications"
+  hdiutil create -volname "CDB PDF Compressor" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+  rm -rf "$(dirname "$STAGE")"
+  echo "✓ $DMG  (mit Applications-Verknüpfung)"
 fi
