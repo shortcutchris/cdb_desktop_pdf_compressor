@@ -48,11 +48,16 @@ jobs:
         with:
           node-version: 20
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install Ghostscript
-        run: choco install ghostscript -y --no-progress
-      - name: Bundle Ghostscript (Windows)
+      - name: Bundle Ghostscript (download official installer + extract)
         shell: pwsh
-        run: ./scripts/bundle-gs.ps1
+        run: |
+          # The choco ghostscript package fails headless; download the official
+          # installer and extract it with 7-Zip (preinstalled on the runner).
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          $url = "https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10071/gs10071w64.exe"
+          Invoke-WebRequest $url -OutFile gs_setup.exe
+          & "C:\Program Files\7-Zip\7z.exe" x gs_setup.exe -oC:\gs-extract -y | Out-Null
+          ./scripts/bundle-gs.ps1 -GsDir C:\gs-extract
       - name: Install JS deps
         run: npm ci
       - name: Build .msi / .exe
