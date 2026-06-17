@@ -44,3 +44,13 @@ plutil -replace CFBundleIconFile -string AppIcon "$APP/Contents/Info.plist"
 codesign --force --deep -s - "$APP"
 
 echo "✓ $APP  (light/dark adaptive icon, bundled gs)"
+
+# 6) optional: wrap the patched .app into a .dmg (pass --dmg)
+if [[ "${1:-}" == "--dmg" ]]; then
+  DMG_DIR="src-tauri/target/release/bundle/dmg"
+  mkdir -p "$DMG_DIR"
+  DMG="$DMG_DIR/CDB PDF Compressor.dmg"
+  rm -f "$DMG"
+  hdiutil create -volname "CDB PDF Compressor" -srcfolder "$APP" -ov -format UDZO "$DMG" >/dev/null
+  echo "✓ $DMG"
+fi

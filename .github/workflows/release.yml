@@ -1,0 +1,73 @@
+name: Release
+
+# Builds the macOS .dmg (Apple Silicon, with the light/dark adaptive icon) and
+# the Windows .msi/.exe, then attaches them to the GitHub release for the tag.
+#
+# Trigger: push a tag like v0.1.0   ->   git tag v0.1.0 && git push origin v0.1.0
+# Or run manually via the Actions tab (workflow_dispatch).
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-14 # Apple Silicon (arm64), matches the bundled Ghostscript
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Ghostscript + dylibbundler
+        run: brew install ghostscript dylibbundler
+      - name: Install JS deps
+        run: npm ci
+      - name: Build .app (bundled gs + adaptive icon) and .dmg
+        run: ./scripts/build-macos.sh --dmg
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: src-tauri/target/release/bundle/dmg/*.dmg
+      - name: Upload artifact (manual runs)
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Ghostscript
+        run: choco install ghostscript -y --no-progress
+      - name: Bundle Ghostscript (Windows)
+        shell: pwsh
+        run: ./scripts/bundle-gs.ps1
+      - name: Install JS deps
+        run: npm ci
+      - name: Build .msi / .exe
+        run: npm run tauri build
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
+      - name: Upload artifact (manual runs)
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installers
+          path: |
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe

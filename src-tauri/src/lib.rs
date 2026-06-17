@@ -8,6 +8,27 @@ use std::process::Command;
 const DPI_MIN: u32 = 72;
 const DPI_MAX: u32 = 300;
 
+// Platform-specific bits of the bundled Ghostscript.
+#[cfg(target_os = "windows")]
+const GS_BUNDLED_BIN: &str = "gs/bin/gswin64c.exe";
+#[cfg(not(target_os = "windows"))]
+const GS_BUNDLED_BIN: &str = "gs/bin/gs";
+
+#[cfg(target_os = "windows")]
+const GS_LIB_SEP: &str = ";"; // Ghostscript GS_LIB path separator on Windows
+#[cfg(not(target_os = "windows"))]
+const GS_LIB_SEP: &str = ":";
+
+/// Prevent a console window from flashing when spawning gs on Windows.
+#[cfg(target_os = "windows")]
+fn hide_console(cmd: &mut Command) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    cmd.creation_flags(CREATE_NO_WINDOW);
+}
+#[cfg(not(target_os = "windows"))]
+fn hide_console(_cmd: &mut Command) {}
+
 /// Map a 1..100 quality percentage to an image resolution in dpi (linear over 72..300).
 fn pct_to_dpi(pct: u32) -> u32 {
     let pct = pct.clamp(1, 100);
@@ -22,9 +43,10 @@ struct GsEngine {
     icc_dir: Option<String>, // value for -sICCProfilesDir (bundled only)
 }
 
-/// Locate a system Ghostscript. GUI apps on macOS don't inherit the shell PATH,
-/// so we probe common Homebrew/system locations in addition to PATH.
+/// Locate a system Ghostscript (dev / when no bundled gs is present).
+#[cfg(not(target_os = "windows"))]
 fn find_system_gs() -> Option<PathBuf> {
+    // GUI apps on macOS don't inherit the shell PATH, so probe common locations too.
     let candidates = [
         "/opt/homebrew/bin/gs", // Apple Silicon Homebrew
         "/usr/local/bin/gs",    // Intel Homebrew
@@ -35,9 +57,20 @@ fn find_system_gs() -> Option<PathBuf> {
             return Some(PathBuf::from(c));
         }
     }
-    // Fallback: rely on PATH (works in `tauri dev`, where the shell PATH is inherited).
     if Command::new("gs").arg("--version").output().is_ok() {
         return Some(PathBuf::from("gs"));
+    }
+    None
+}
+
+#[cfg(target_os = "windows")]
+fn find_system_gs() -> Option<PathBuf> {
+    // Rely on PATH (a system Ghostscript install adds gswin64c to PATH).
+    let mut probe = Command::new("gswin64c");
+    probe.arg("--version");
+    hide_console(&mut probe);
+    if probe.output().is_ok() {
+        return Some(PathBuf::from("gswin64c"));
     }
     None
 }
@@ -47,7 +80,7 @@ fn find_system_gs() -> Option<PathBuf> {
 fn resolve_gs(app: &tauri::AppHandle) -> Option<GsEngine> {
     use tauri::Manager;
     if let Ok(res) = app.path().resource_dir() {
-        let bin = res.join("gs/bin/gs");
+        let bin = res.join(GS_BUNDLED_BIN);
         if bin.exists() {
             let share = res.join("gs/share/ghostscript");
             let gs_lib = [
@@ -59,7 +92,7 @@ fn resolve_gs(app: &tauri::AppHandle) -> Option<GsEngine> {
             .iter()
             .map(|p| p.to_string_lossy().into_owned())
             .collect::<Vec<_>>()
-            .join(":");
+            .join(GS_LIB_SEP);
             return Some(GsEngine {
                 bin,
                 gs_lib: Some(gs_lib),
@@ -108,6 +141,7 @@ fn unique_compressed_path(src: &Path) -> PathBuf {
 fn check_ghostscript(app: tauri::AppHandle) -> Result<String, String> {
     let engine = resolve_gs(&app).ok_or_else(|| "Ghostscript (gs) nicht gefunden".to_string())?;
     let mut cmd = Command::new(&engine.bin);
+    hide_console(&mut cmd);
     if let Some(lib) = &engine.gs_lib {
         cmd.env("GS_LIB", lib);
     }
@@ -160,6 +194,7 @@ fn compress_pdf_blocking(
     let tmp = src.with_extension("gscompress.tmp.pdf");
 
     let mut cmd = Command::new(&engine.bin);
+    hide_console(&mut cmd);
     // Bundled gs needs GS_LIB / ICC dir pointing at its relocated resources;
     // a system gs finds its own (these are None then).
     if let Some(lib) = &engine.gs_lib {

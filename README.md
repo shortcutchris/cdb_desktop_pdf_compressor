@@ -10,34 +10,57 @@ App gibt ihr eine native, drag-&-drop-fähige Oberfläche.
 
 ## Status
 
-🏗️ **Scaffold steht.** Tauri v2 + React + TypeScript + Vite, Frontend baut (`npm run build`).
-Engine-Anbindung (Ghostscript) und UI (Drag & Drop, Slider, Ergebnis-Tabelle) folgen.
+✅ **MVP läuft (macOS).** Tauri v2 + React/TS/Vite. Drag & Drop + Dateidialog,
+Qualitäts-Slider (1–100 %) + Presets, Batch, Vorher/Nachher-Tabelle, Finder-artige
+Versionierung, i18n (DE/EN), Theme-Umschalter (hell/dunkel/system), CDB-Brand-Icon
+mit macOS-Hell/Dunkel-Umschaltung. Ghostscript ist self-contained gebündelt
+(läuft ohne `brew install`). Windows-Build über CI vorbereitet.
 
-- `src/`, `src-tauri/` — Tauri-v2-App (React-TS-Template, umbenannt auf `cdb-pdf-compressor`)
-- `reference-skill/` — 1:1-Kopie des `pdf-compress`-Skills (Engine-Referenz: `tools/compress.py`)
-- `REQUIREMENTS.md` — Funktions- und Nicht-Funktionsanforderungen
-- `RESEARCH.md` — Markt-/Bibliotheks-/Framework-Recherche + Empfehlung
-- `LICENSE` — AGPL-3.0
+- `src/`, `src-tauri/` — Tauri-v2-App
+- `icon-src/` — Icon-Master (hell/dunkel), erzeugt via `scripts/gen-icon.py`
+- `reference-skill/` — Engine-Referenz (`tools/compress.py`)
+- `REQUIREMENTS.md` · `RESEARCH.md` · `LICENSE` (AGPL-3.0)
 
 ## Entwicklung
 
 ```bash
 npm install
-npm run tauri dev     # benötigt Rust/Cargo (siehe unten)
+npm run tauri dev     # nutzt im Dev das System-gs; benötigt Rust/Cargo
 ```
 
-> **Voraussetzung Rust:** Tauri baut den nativen Core mit Cargo. Einmalig installieren:
-> `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
-> (Node ✓ und Ghostscript `gs` ✓ sind auf diesem Rechner bereits vorhanden.)
+> **Rust** einmalig: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+
+## Builds
+
+**macOS** (Apple Silicon, mit gebündeltem gs + Hell/Dunkel-Icon):
+```bash
+brew install ghostscript dylibbundler
+./scripts/build-macos.sh --dmg      # -> src-tauri/target/release/bundle/{macos,dmg}
+```
+
+**Windows** (auf einem Windows-Rechner):
+```powershell
+choco install ghostscript
+pwsh scripts/bundle-gs.ps1          # bündelt gswin64c.exe + Resources
+npm ci; npm run tauri build         # -> src-tauri/target/release/bundle/{msi,nsis}
+```
+
+**CI / Releases:** Ein Git-Tag `v*` pushen → `.github/workflows/release.yml` baut auf
+macOS- **und** Windows-Runnern und hängt `.dmg`/`.msi`/`.exe` ans GitHub-Release.
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
 
 ## Eckdaten
 
 - **100 % lokal & offline** — kein Upload, keine Cloud, kein Tracking
-- **Open Source** (kein Verkauf). Wegen gebündeltem Ghostscript: Lizenz **AGPL-3.0**
-- **Engine:** Ghostscript (`gs`), optional pikepdf-Fallback für problematische PDFs
-- **Plattform:** macOS zuerst (Apple Silicon + Intel), Windows als Option
+- **Open Source.** Wegen gebündeltem Ghostscript: Lizenz **AGPL-3.0**
+- **Engine:** Ghostscript (`gs`), self-contained gebündelt pro Plattform
+- **Plattform:** macOS (Apple Silicon) fertig; Windows über CI; Intel/Universal = Folgeschritt
 
-## Nächster Schritt
+## Hinweise
 
-Framework-Entscheidung treffen (siehe `RESEARCH.md`, Abschnitt „Empfehlung"),
-dann Projekt-Scaffold + MVP.
+- Das `.app`/`.dmg` ist **ad-hoc signiert** (nicht notarisiert) → beim ersten Öffnen
+  ggf. Rechtsklick → „Öffnen". Notarisierung ist ein offener Folgeschritt.
+- `src-tauri/gs/` (gebündeltes Ghostscript) ist **gitignored** und wird beim Build
+  via `scripts/bundle-gs.sh` (macOS) bzw. `scripts/bundle-gs.ps1` (Windows) erzeugt.
